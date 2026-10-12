@@ -1,0 +1,527 @@
+name: Build BX2 APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+      - name: Generate BX2 project files
+        run: |
+          mkdir -p app app/src/main app/src/main/assets app/src/main/java/com/bx2/prank app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 app/src/main/res/values
+          cat > app/build.gradle.kts <<'BX2_EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.bx2.prank"
+              compileSdk = 34
+              defaultConfig {
+                  applicationId = "com.bx2.prank"
+                  minSdk = 26
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+              buildTypes { release { isMinifyEnabled = false } }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation("androidx.core:core-ktx:1.13.1")
+              implementation("androidx.appcompat:appcompat:1.7.0")
+              implementation("androidx.webkit:webkit:1.11.0")
+          }
+          BX2_EOF
+          cat > app/src/main/AndroidManifest.xml <<'BX2_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+              <uses-feature android:name="android.hardware.camera" android:required="false" />
+              <application
+                  android:allowBackup="false"
+                  android:icon="@mipmap/ic_launcher"
+                  android:roundIcon="@mipmap/ic_launcher"
+                  android:label="@string/app_name"
+                  android:theme="@style/Theme.BX2">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTask"
+                      android:screenOrientation="portrait"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <service android:name=".FreezeService" android:exported="false" />
+              </application>
+          </manifest>
+          BX2_EOF
+          cat > app/src/main/assets/index.html <<'BX2_EOF'
+          <!DOCTYPE html>
+          <html lang="ar" dir="rtl">
+          <head>
+          <meta charset="utf-8">
+          <title>BX2 Prank</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+          <meta name="theme-color" content="#0a0710"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="BX2 Prank">
+          <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+          <style>
+          :root{--bg:#0a0710;--card:#150f1f;--line:#2a1f3d;--red:#ff2e4d;--ice:#8fe3ff;--tx:#efe9f7;--mut:#8a7fa0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+          @media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#0a0710}}
+          *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+          html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font-family:'Tajawal',system-ui,sans-serif;overflow-x:hidden}
+          body{display:flex;flex-direction:column}
+          .mono{font-family:'Share Tech Mono',ui-monospace,monospace;direction:ltr}
+          #splash{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .6s}
+          #splash h1{font-size:44px;margin:0;letter-spacing:6px;font-weight:800}
+          #splash p{color:var(--mut);margin:0}
+          .logo{width:120px;height:120px;filter:drop-shadow(0 0 22px #ff2e4d88);animation:pulse 2s infinite}
+          @keyframes pulse{50%{filter:drop-shadow(0 0 38px #ff2e4dcc)}}
+          header{padding:18px 18px 8px;display:flex;align-items:center;gap:12px}
+          header svg{width:44px;height:44px}
+          header b{font-size:22px;letter-spacing:3px;font-weight:800}
+          header small{display:block;color:var(--mut);font-size:12px}
+          #view{flex:1;padding:8px 16px 16px;overflow-y:auto}
+          .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+          .cat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px 12px;text-align:center;font-weight:800;font-size:17px;color:var(--tx);cursor:pointer}
+          .cat i{display:block;font-style:normal;font-size:34px;margin-bottom:8px}
+          .cat small{display:block;color:var(--mut);font-weight:500;font-size:12px;margin-top:4px}
+          .cat:active,.item:active{transform:scale(.97);border-color:var(--red)}
+          .back{background:none;border:0;color:var(--ice);font:inherit;font-size:16px;padding:6px 0 12px;cursor:pointer}
+          .item{display:flex;align-items:center;gap:12px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:9px;color:var(--tx);font:inherit;font-weight:500;font-size:16px;text-align:start;cursor:pointer}
+          .item i{font-style:normal;font-size:24px;width:32px;text-align:center}
+          .item span{flex:1}.item em{font-style:normal;color:var(--mut);font-size:12px}
+          .set{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+          .set label{display:flex;justify-content:space-between;margin-bottom:8px}
+          .set input[type=range]{width:100%;accent-color:var(--red)}
+          footer{padding:10px;text-align:center;color:var(--mut);font-size:12px;border-top:1px solid var(--line)}
+          footer b{color:var(--red)}
+          #fx{position:fixed;inset:0;z-index:100;display:none;background:#000;overflow:hidden}
+          #fx.on{display:block}
+          #fx .x{position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);left:8px;z-index:5;color:#fff;opacity:.18;font-size:22px;background:none;border:0;padding:8px 12px}
+          #term{position:absolute;inset:0;padding:calc(env(safe-area-inset-top,0px) + 40px) 14px 14px;color:#39ff7a;font-size:13px;line-height:1.5;overflow:hidden;white-space:pre-wrap;word-break:break-all}
+          .bar{height:10px;border:1px solid #39ff7a;margin-top:8px}.bar div{height:100%;width:0;background:#39ff7a}
+          canvas.full{position:absolute;inset:0;width:100%;height:100%}
+          .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:12px}
+          .bsod{background:#0b57d0;color:#fff;align-items:flex-start;text-align:start;direction:ltr;font-family:'Share Tech Mono',monospace}
+          .bsod h1{font-size:90px;margin:0}
+          .glitch{animation:gl .15s steps(2) infinite}
+          @keyframes gl{0%{transform:translate(0)}25%{transform:translate(-8px,4px);filter:hue-rotate(90deg) invert(.2)}50%{transform:translate(9px,-5px);filter:invert(.9)}75%{transform:translate(-5px,-3px);filter:hue-rotate(200deg)}100%{transform:translate(0)}}
+          .shake{animation:sh .08s infinite}@keyframes sh{0%{transform:translate(4px,3px)}50%{transform:translate(-4px,-3px)}100%{transform:translate(3px,-4px)}}
+          .flash{animation:fl .12s steps(2) infinite}@keyframes fl{50%{background:#fff}}
+          .spin{width:46px;height:46px;border:4px solid #444;border-top-color:#fff;border-radius:50%;animation:rot 1s linear infinite}@keyframes rot{to{transform:rotate(360deg)}}
+          #ice{position:fixed;inset:0;z-index:200;display:none;cursor:none}
+          .drip{position:absolute;top:0;width:14px;background:linear-gradient(#a00,#600);border-radius:0 0 8px 8px;animation:dr 3s ease-in forwards}@keyframes dr{from{height:0}to{height:var(--h)}}
+          body.frozen *{animation-play-state:paused!important}
+          @media (prefers-reduced-motion:reduce){.logo{animation:none}}
+          </style>
+          </head>
+          <body>
+          <div id="splash" onclick="enter()">
+            <svg class="logo" viewBox="0 0 120 120"><rect width="120" height="120" rx="28" fill="#150f1f"/><rect x="2" y="2" width="116" height="116" rx="26" fill="none" stroke="#ff2e4d" stroke-width="2"/><path d="M60 22c-20 0-32 14-32 31 0 10 4 17 10 22v10h8l2-5 4 5 4-5 4 5 2-5h8V75c6-5 10-12 10-22 0-17-12-31-32-31z" fill="#efe9f7"/><circle cx="47" cy="55" r="8" fill="#0a0710"/><circle cx="73" cy="55" r="8" fill="#0a0710"/><circle cx="47" cy="55" r="3" fill="#ff2e4d"/><circle cx="73" cy="55" r="3" fill="#ff2e4d"/><path d="M60 62l-4 9h8z" fill="#0a0710"/></svg>
+            <h1>BX2</h1><p>Prank Terminal</p><p class="mono" style="font-size:12px">اضغط للدخول</p>
+            <p style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);font-size:13px">© BX2 — جميع الحقوق محفوظة</p>
+          </div>
+          <header>
+            <svg viewBox="0 0 120 120"><rect width="120" height="120" rx="28" fill="#150f1f"/><path d="M60 22c-20 0-32 14-32 31 0 10 4 17 10 22v10h8l2-5 4 5 4-5 4 5 2-5h8V75c6-5 10-12 10-22 0-17-12-31-32-31z" fill="#efe9f7"/><circle cx="47" cy="55" r="8" fill="#0a0710"/><circle cx="73" cy="55" r="8" fill="#0a0710"/><circle cx="47" cy="55" r="3" fill="#ff2e4d"/><circle cx="73" cy="55" r="3" fill="#ff2e4d"/></svg>
+            <div><b>BX2 PRANK</b><small>تطبيق مقالب — كله تمثيل</small></div>
+          </header>
+          <div id="view"></div>
+          <footer>© <b>BX2</b> 2026 — كل الحقوق محفوظة</footer>
+          <div id="fx"></div>
+          <div id="ice"></div>
+
+          <script>
+          const S={delay:10,dly:false,freeze:10,dur:20,vol:.8,vib:true};
+          const $=s=>document.querySelector(s),fx=$('#fx'),view=$('#view');
+          let AC,timers=[],stopFns=[],taps=0;
+          function enter(){$('#splash').style.opacity=0;fs();try{navigator.wakeLock.request('screen')}catch(e){}setTimeout(()=>$('#splash').remove(),600);try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}home()}
+          const sleep=ms=>new Promise(r=>timers.push(setTimeout(r,ms)));
+          const vib=p=>{if(S.vib)try{navigator.vibrate(p)}catch(e){}};
+
+          /* ---------- sound ---------- */
+          function ac(){if(AC&&AC.state==='suspended')AC.resume();return AC}
+          function g(v=1){const n=ac().createGain();n.gain.value=v*S.vol;n.connect(AC.destination);return n}
+          function osc(type,f1,f2,dur,v=.5){if(!ac())return;const o=AC.createOscillator(),o_g=g(v);o.type=type;o.frequency.setValueAtTime(f1,AC.currentTime);o.frequency.exponentialRampToValueAtTime(f2,AC.currentTime+dur);o_g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+dur);o.connect(o_g);o.start();o.stop(AC.currentTime+dur);}
+          function noise(dur,v=.5,fq=0){if(!ac())return null;const b=AC.createBuffer(1,AC.sampleRate*dur,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const s=AC.createBufferSource();s.buffer=b;const o_g=g(v);let n=s;if(fq){const f=AC.createBiquadFilter();f.type='bandpass';f.frequency.value=fq;f.Q.value=4;s.connect(f);n=f}n.connect(o_g);s.start();return o_g}
+          const snd={
+           scream(){osc('sawtooth',500,1800,1.4,.6);osc('square',700,2400,1.2,.35);noise(1.2,.5,2500);vib([300,80,300])},
+           bass(){osc('sine',90,30,1.5,1);noise(.4,.6,120)},
+           beep(){osc('square',1200,1200,.12,.25)},
+           static_(){noise(1.2,.6)},
+           heart(){for(let i=0;i<10;i++){timers.push(setTimeout(()=>{osc('sine',70,35,.18,1)},i*900));timers.push(setTimeout(()=>{osc('sine',60,30,.15,.7)},i*900+260))}vib([80,150,80,700,80,150,80,700])},
+           whisper(){const n=noise(6,.5,3200);if(n)for(let i=0;i<12;i++)n.gain.setValueAtTime(Math.random()*.5*S.vol,AC.currentTime+i*.5)},
+           siren(){for(let i=0;i<8;i++)timers.push(setTimeout(()=>osc('sawtooth',i%2?600:900,i%2?900:600,.5,.3),i*500))},
+           glass(){noise(.5,.8,6000);osc('triangle',3000,800,.4,.3)},
+           knock(){[0,300,600,1400,1700].forEach(t=>timers.push(setTimeout(()=>{osc('sine',160,60,.12,1);vib(60)},t)))},
+           laugh(){for(let i=0;i<6;i++)timers.push(setTimeout(()=>osc('sawtooth',300-i*20,200-i*15,.18,.4),i*230))},
+           drone(){osc('sawtooth',55,50,5,.5);osc('sawtooth',58,52,5,.5)},cry(){for(let i=0;i<5;i++)timers.push(setTimeout(()=>osc('sawtooth',420,640,.5,.35),i*700))},breath(){for(let i=0;i<4;i++)timers.push(setTimeout(()=>noise(.9,.5,900),i*1400))},chains(){for(let i=0;i<14;i++)timers.push(setTimeout(()=>noise(.07,.7,5000),i*130+rnd(0,60)))},scratch(){noise(1.2,.5,6500)}
+          };
+
+          /* ---------- visuals ---------- */
+          function face(k){
+           if(k==='skull')return SKULL;
+           const eyes=k==='eyes'?Array.from({length:14},()=>{const x=20+Math.random()*360,y=20+Math.random()*460,r=10+Math.random()*22;return `<ellipse cx="${x}" cy="${y}" rx="${r*1.5}" ry="${r}" fill="#e8e0d0"/><circle cx="${x}" cy="${y}" r="${r*.5}" fill="#c00"/><circle cx="${x}" cy="${y}" r="${r*.2}" fill="#000"/>`}).join(''):'';
+           if(k==='eyes')return `<svg viewBox="0 0 400 500" class="full" style="position:absolute;inset:0;width:100%;height:100%;background:#050000" preserveAspectRatio="xMidYMid slice">${eyes}</svg>`;
+           const teeth=Array.from({length:12},(_,i)=>`<path d="M${108+i*15} 345l7 ${30+(i%3)*8}l7-${30+(i%3)*8}z" fill="#d8d0b8"/><path d="M${108+i*15} 410l7-${22+(i%2)*10}l7 ${22+(i%2)*10}z" fill="#d8d0b8"/>`).join('');
+           return `<svg viewBox="0 0 400 500" style="position:absolute;inset:0;width:100%;height:100%" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="r"><stop offset="0" stop-color="#400"/><stop offset="1" stop-color="#000"/></radialGradient></defs><rect width="400" height="500" fill="url(#r)"/><path d="M200 30c-95 0-140 80-135 190 3 90 40 190 135 250 95-60 132-160 135-250C340 110 295 30 200 30z" fill="#cfc8b4"/><path d="M80 150c40-30 70-5 90 20M320 150c-40-30-70-5-90 20" stroke="#222" stroke-width="7" fill="none"/><ellipse cx="140" cy="215" rx="42" ry="52" fill="#000"/><ellipse cx="260" cy="215" rx="42" ry="52" fill="#000"/><circle cx="140" cy="222" r="9" fill="#f00"/><circle cx="260" cy="222" r="9" fill="#f00"/><path d="M200 255l-14 55h28z" fill="#111"/><path d="M100 345Q200 440 300 345Q200 485 100 345z" fill="#120000"/><ellipse cx="200" cy="385" rx="95" ry="52" fill="#080000"/>${teeth}<path d="M120 280c-6 40-4 90 4 130M283 270c8 50 6 100-2 140" stroke="#800" stroke-width="3" fill="none"/></svg>`}
+          function show(html,cls=''){stop(false);fx.className='on '+cls;fx.innerHTML=`<button class="x" onclick="stop()">✕</button>`+html;fx.onclick=()=>{taps++;setTimeout(()=>taps=0,700);if(taps>=3)stop()};}
+          function stop(full=true){timers.forEach(clearTimeout);timers=[];stopFns.forEach(f=>f());stopFns=[];document.body.classList.remove('frozen');$('#ice').style.display='none';try{navigator.vibrate(0)}catch(e){}if(AC&&full)AC.suspend().then(()=>AC.resume());fx.className='';fx.innerHTML='';fx.onclick=null}
+          function autoStop(ms){timers.push(setTimeout(stop,ms))}
+
+          /* ---------- actions ---------- */
+          async function terminal(title,lines,end,endCol='#39ff7a'){
+           show(`<div id="term" class="mono"></div>`);const t=$('#term');let out=`<b>${title}</b>\n`;t.innerHTML=out;
+           for(const l of lines){snd.beep();out+=`> ${l}\n`;t.innerHTML=out+'<div class="bar"><div id="pb"></div></div>';const pb=$('#pb');
+            for(let p=0;p<=100;p+=20){pb.style.width=p+'%';await sleep(90+Math.random()*160)}
+            out+=`  [OK] ${Math.random().toString(16).slice(2,10)}\n`;t.scrollTop=1e5}
+           t.innerHTML=out+`\n<b style="color:${endCol};font-size:22px">${end}</b>`;vib([200,100,200]);
+          }
+          const ips=()=>`${rnd(10,250)}.${rnd(0,255)}.${rnd(0,255)}.${rnd(1,254)}`,rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+          function matrix(){show(`<canvas class="full"></canvas>`);const c=fx.querySelector('canvas');c.width=innerWidth;c.height=innerHeight;const x=c.getContext('2d'),cols=Math.floor(c.width/16),y=Array(cols).fill(0);const id=setInterval(()=>{x.fillStyle='rgba(0,0,0,.08)';x.fillRect(0,0,c.width,c.height);x.fillStyle='#39ff7a';x.font='16px monospace';y.forEach((v,i)=>{x.fillText(String.fromCharCode(0x30A0+Math.random()*90),i*16,v*16);y[i]=v*16>c.height&&Math.random()>.97?0:v+1})},50);stopFns.push(()=>clearInterval(id));autoStop(S.dur*1000)}
+          function glitch(){show(`<div class="center glitch" style="background:#111"><h1 class="mono" style="color:#ff2e4d;font-size:40px">SYSTEM ERROR</h1><p class="mono">0xDEAD${rnd(1000,9999)} — memory corrupted</p></div>`);loop(snd.static_,1200);vib([100,50,100,50,200]);autoStop(S.dur*1000)}
+          async function freeze(){
+           if(window.BX2){const d=S.dly?S.delay:3;BX2.freezeAll(d,S.freeze);note('بعد '+d+'ث يتجمد الجوال كله لمدة '+S.freeze+'ث');return}
+           fs();snd.drone();const ice=$('#ice');ice.style.display='block';['touchstart','touchend','click','pointerdown'].forEach(e=>ice.addEventListener(e,ev=>ev.preventDefault(),{passive:false}));try{history.pushState(null,'',location.href)}catch(e){}await new Promise(r=>setTimeout(r,400));const end=performance.now()+S.freeze*1000;while(performance.now()<end){}
+           await new Promise(r=>setTimeout(r,800));ice.style.display='none';jump('rand');
+          }
+          async function freezeSoft(){
+           const sec=S.freeze;document.body.classList.add('frozen');const ice=$('#ice');ice.style.display='block';
+           ['touchstart','touchmove','click','keydown'].forEach(e=>ice.addEventListener(e,ev=>ev.preventDefault(),{passive:false}));
+           await new Promise(r=>setTimeout(r,sec*1000));ice.style.display='none';document.body.classList.remove('frozen');
+           show(`<div class="center" style="background:#fff;color:#000"><h2>⚠️ التطبيق لا يستجيب</h2></div>`);snd.glass();await sleep(700);jump('face');
+          }
+          function bsod(){show(`<div class="center bsod"><h1>:(</h1><div style="font-size:20px">Your device ran into a problem and needs to restart.</div><div class="mono" style="opacity:.8;margin-top:10px">Stop code: CRITICAL_PROCESS_DIED<br>BX2_KERNEL_0x0000007E</div><div style="margin-top:20px">0% complete</div></div>`);snd.bass();vib(500)}
+          async function update(){show(`<div class="center" style="background:#000"><div class="spin"></div><div id="u" class="mono">Updating… 0%</div><small style="color:#888">لا تطفي الجهاز</small></div>`);for(let i=0;i<=100;i+=4){const u=$('#u');if(!u)return;u.textContent=`Updating… ${i}%`;await sleep(i>90?900:200)}$('#u')&&jump('face')}
+          function battery(){show(`<div class="center" style="background:#000"><div style="font-size:70px">🪫</div><h2 style="color:#ff2e4d">البطارية 1%</h2><p>الجهاز سيتم إيقافه…</p></div>`);snd.beep();timers.push(setTimeout(()=>fx.innerHTML='',3500));timers.push(setTimeout(()=>{show('<div style="position:absolute;inset:0;background:#000"></div>')},3600))}
+          function crack(){let p='';for(let i=0;i<9;i++){let x=200,y=250,d='M200 250';for(let j=0;j<7;j++){x+=Math.cos(i*.7)*45+rnd(-18,18);y+=Math.sin(i*.7)*45+rnd(-18,18);d+=`L${x} ${y}`}p+=`<path d="${d}" stroke="#fff" stroke-width="1.6" fill="none" opacity=".9"/>`}
+           show(`<svg viewBox="0 0 400 500" style="position:absolute;inset:0;width:100%;height:100%;background:#ffffff10" preserveAspectRatio="none">${p}<circle cx="200" cy="250" r="9" fill="#fff"/></svg>`,'');fx.style.background='transparent';fx.style.pointerEvents='auto';snd.glass();vib(200);timers.push(setTimeout(()=>{fx.style.background=''},9999999))}
+          function black(){show('<div style="position:absolute;inset:0;background:#000"></div>');snd.drone()}
+          function flicker(){show(`<div class="flash" style="position:absolute;inset:0;background:#000"></div>`);loop(snd.static_,1200);loop(()=>vib([60,60,60,60,60]),700);autoStop(S.dur*1000)}
+          function jump(k='face'){if(k==='rand')k=['face','eyes','skull'][rnd(0,2)];show(face(k),k==='face'?'shake':'flash');snd.scream();timers.push(setTimeout(stop,3800))}
+          function blood(){show(`<div id="bl" style="position:absolute;inset:0;background:#000"></div>`);const b=$('#bl');for(let i=0;i<30;i++){const d=document.createElement('div');d.className='drip';d.style.cssText=`left:${i*3.4}%;--h:${rnd(20,95)}vh;animation-delay:${Math.random()*2}s`;b.appendChild(d)}b.insertAdjacentHTML('beforeend','<div class="center"><h1 style="color:#ff2e4d;font-size:42px;text-shadow:0 0 20px #f00">أنا أشوفك...</h1></div>');snd.whisper();snd.heart()}
+          async function ghost(){show(`<div id="gc" style="position:absolute;inset:0;padding:60px 16px;background:#0b141a"></div>`);const m=['مرحبا','أنت وحدك؟','لا تلتفت...','أنا خلفك','🙂','شفتك من الكاميرا'];for(const t of m){const gc=$('#gc');if(!gc)return;gc.insertAdjacentHTML('beforeend',`<div style="background:#202c33;padding:10px 14px;border-radius:12px;margin:8px 0;width:fit-content">${t}</div>`);snd.beep();vib(80);await sleep(1400)}$('#gc')&&jump('eyes')}
+          function dark(){show(`<div style="position:absolute;inset:0;background:#000"></div>`);snd.drone();snd.heart();timers.push(setTimeout(()=>{fx.insertAdjacentHTML('beforeend',`<svg viewBox="0 0 200 60" style="position:absolute;top:40%;left:15%;width:70%"><ellipse cx="55" cy="30" rx="22" ry="12" fill="#e8e0d0"/><ellipse cx="145" cy="30" rx="22" ry="12" fill="#e8e0d0"/><circle cx="55" cy="30" r="7" fill="#e00"/><circle cx="145" cy="30" r="7" fill="#e00"/></svg>`);snd.whisper()},4000));timers.push(setTimeout(()=>jump('face'),9000))}
+          function randomScare(){stop();const w=S.dur;show(`<div style="position:absolute;inset:0;background:#000"></div>`);fx.style.opacity='.02';timers.push(setTimeout(()=>{fx.style.opacity='';jump(Math.random()>.5?'face':'eyes')},w*1000))}
+          function sound(n){return ()=>{snd[n]();}}
+
+          const SKULL=`<svg viewBox="0 0 400 500" style="position:absolute;inset:0;width:100%;height:100%" preserveAspectRatio="xMidYMid slice"><rect width="400" height="500" fill="#100"/><path d="M200 40c-90 0-130 60-125 140 3 45 25 70 50 85v60h150v-60c25-15 47-40 50-85 5-80-35-140-125-140z" fill="#e6dfc8"/><ellipse cx="145" cy="190" rx="45" ry="55" fill="#000"/><ellipse cx="255" cy="190" rx="45" ry="55" fill="#000"/><circle cx="145" cy="195" r="10" fill="#f00"/><circle cx="255" cy="195" r="10" fill="#f00"/><path d="M200 245l-18 45h36z" fill="#000"/><path d="M135 330h130v50H135z" fill="#e6dfc8"/><path d="M155 325v65M180 325v65M205 325v65M230 325v65M250 325v65" stroke="#000" stroke-width="5"/></svg>`;
+          function loop(f,ms){f();const id=setInterval(f,ms);stopFns.push(()=>clearInterval(id))}
+          function note(m){let n=$('#nt');if(!n){n=document.createElement('div');n.id='nt';n.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#ff2e4d;color:#fff;padding:10px 16px;border-radius:12px;z-index:300;font-size:14px';document.body.appendChild(n)}n.textContent=m;n.style.display='block';setTimeout(()=>n.style.display='none',3500)}
+          function fs(){const d=document.documentElement;try{Promise.resolve((d.requestFullscreen||d.webkitRequestFullscreen).call(d)).catch(()=>note('المتصفح منع ملء الشاشة. حمّل الملف وأضفه للشاشة الرئيسية'))}catch(e){note('ملء الشاشة غير مدعوم هنا')}}
+          function speak(t,l='ar-SA'){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang=l;u.pitch=.1;u.rate=.55;u.volume=S.vol;speechSynthesis.speak(u);stopFns.push(()=>speechSynthesis.cancel())}catch(e){note('الصوت غير مدعوم')}}
+          function voice(){show(`<div class="center" style="background:#000"><h1 style="color:#ff2e4d;text-shadow:0 0 20px #f00">أنا أشوفك</h1></div>`);speak('أنا أشوفك. لا تلتفت. أنا خلفك');snd.drone();autoStop(9000)}
+          function lamp(){show(`<div style="position:absolute;inset:0;background:#000;touch-action:none"><div id="lm" style="position:absolute;inset:0;--x:50%;--y:50%;-webkit-mask-image:radial-gradient(circle 80px at var(--x) var(--y),#000 30%,transparent);mask-image:radial-gradient(circle 80px at var(--x) var(--y),#000 30%,transparent)">${face(['face','skull','eyes'][rnd(0,2)])}</div></div>`);const m=e=>{const t=e.touches?e.touches[0]:e,l=$('#lm');if(l){l.style.setProperty('--x',t.clientX+'px');l.style.setProperty('--y',t.clientY+'px')}};fx.addEventListener('touchmove',m,{passive:true});fx.addEventListener('mousemove',m);snd.drone();snd.whisper();timers.push(setTimeout(()=>jump('rand'),S.dur*1000))}
+          function spiders(){show(`<div id="sp" style="position:absolute;inset:0;background:#0a0a0a"></div>`);const sp=$('#sp'),a=[];for(let i=0;i<40;i++){const e=document.createElement('span');e.textContent='🕷️';e.style.cssText=`position:absolute;font-size:${rnd(22,44)}px;left:${rnd(0,90)}%;top:${rnd(0,90)}%;transition:all ${rnd(10,25)/10}s linear`;sp.appendChild(e);a.push(e)}loop(()=>a.forEach(e=>{e.style.left=rnd(-5,95)+'%';e.style.top=rnd(-5,95)+'%'}),1500);loop(snd.scratch,2500);vib([100,50,100]);autoStop(S.dur*1000)}
+          function death(){let n=10;show(`<div class="center" style="background:#200"><div class="mono" id="dn" style="font-size:120px;color:#ff2e4d">10</div><p>الجهاز مصاب… باقي ثواني</p></div>`);snd.siren();loop(()=>{const d=$('#dn');if(d)d.textContent=n;snd.beep();vib(100);if(n--<=0)jump('rand')},1000)}
+          function call(){show(`<div class="center" style="background:#111"><div style="font-size:64px">👤</div><h2>مجهول</h2><p class="mono">incoming call…</p><div style="display:flex;gap:40px;margin-top:40px"><button onclick="callAns()" style="font-size:30px;border:0;border-radius:50%;width:70px;height:70px;background:#2ecc71">📞</button><button onclick="callAns()" style="font-size:30px;border:0;border-radius:50%;width:70px;height:70px;background:#e74c3c">✖</button></div></div>`);loop(()=>{osc('sine',440,480,.4,.4);setTimeout(()=>osc('sine',440,480,.4,.4),500);vib([400,200,400])},2500)}
+          function callAns(){show(`<div class="center" style="background:#000"><p class="mono" style="color:#555">00:01</p></div>`);snd.breath();speak('أنا أشوفك');timers.push(setTimeout(()=>jump('rand'),4500))}
+          function possessed(){show(`<canvas class="full" id="nz"></canvas><div id="pf" style="position:absolute;inset:0;display:none">${SKULL}</div>`);const c=$('#nz');c.width=120;c.height=200;const x=c.getContext('2d');loop(()=>{const im=x.createImageData(120,200);for(let i=0;i<im.data.length;i+=4){im.data[i]=im.data[i+1]=im.data[i+2]=Math.random()*255;im.data[i+3]=255}x.putImageData(im,0,0)},70);loop(snd.static_,1200);loop(()=>{if(Math.random()<.4){const p=$('#pf');if(p){p.style.display='block';snd.bass();vib(120);setTimeout(()=>{p.style.display='none'},110)}}},1300);autoStop(S.dur*1000)}
+          async function devinfo(){let b='N/A';try{const bt=await navigator.getBattery();b=Math.round(bt.level*100)+'%'+(bt.charging?' (charging)':'')}catch(e){}const n=navigator;terminal('DEVICE SCAN',['Platform: '+(n.platform||'?'),'Screen: '+screen.width+'x'+screen.height,'Battery: '+b,'Language: '+n.language,'Timezone: '+Intl.DateTimeFormat().resolvedOptions().timeZone,'CPU cores: '+(n.hardwareConcurrency||'?'),'RAM: '+(n.deviceMemory||'?')+' GB','Online: '+n.onLine,'Agent: '+n.userAgent.slice(0,70)],'ALL DATA COLLECTED','#ff2e4d')}
+          async function cam(){try{const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}});show(`<video id="cv" autoplay playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:grayscale(1) contrast(1.6) sepia(1) hue-rotate(-50deg) saturate(4)"></video><div class="center" style="pointer-events:none"><h1 class="mono" style="color:#ff2e4d;text-shadow:0 0 12px #f00">● REC</h1></div><div id="pf" style="position:absolute;inset:0;display:none">${SKULL}</div>`);$('#cv').srcObject=st;stopFns.push(()=>st.getTracks().forEach(t=>t.stop()));loop(()=>{if(Math.random()<.3){const p=$('#pf');if(p){p.style.display='block';snd.beep();setTimeout(()=>{p.style.display='none'},120)}}},1500);autoStop(S.dur*1000)}catch(e){note('الكاميرا غير مسموحة. فعّل الإذن')}}
+          async function torch(){try{const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}),tr=st.getVideoTracks()[0];let on=false;show(`<div></div>`);loop(()=>{on=!on;fx.style.background=on?'#fff':'#000';tr.applyConstraints({advanced:[{torch:on}]}).catch(()=>{})},130);stopFns.push(()=>st.getTracks().forEach(t=>t.stop()));autoStop(S.dur*1000)}catch(e){note('الكشاف غير مدعوم في جهازك أو المتصفح')}}
+          function vibeLoop(){show(`<div class="center" style="background:#000"><div style="font-size:70px">📳</div></div>`);loop(()=>{try{navigator.vibrate([300,100,300,100,900])}catch(e){}},1600);autoStop(S.dur*1000)}
+          /* ---------- menus ---------- */
+          const MENUS={
+           hack:{ic:'💻',t:'هاك وهمي',d:'محاكاة اختراق',items:[
+            ['📶','اختراق واي فاي',()=>terminal('WIFI CRACKER v3.1',['Scanning networks…','Capturing handshake','Brute-forcing WPA2','Decrypting key'],'PASSWORD: '+Math.random().toString(36).slice(2,10).toUpperCase())],
+            ['📱','اختراق الجوال',()=>terminal('PHONE EXPLOIT',['Connecting to '+ips(),'Injecting payload','Bypassing lockscreen','Rooting device'],'ACCESS GRANTED')],
+            ['📷','فتح الكاميرا عن بعد',()=>terminal('CAM-RAT',['Locating device','Opening camera stream','Recording…'],'● REC — 00:00:07','#ff2e4d')],
+            ['🔑','سحب كل الباسوردات',()=>terminal('PASS-DUMP',['Reading browser vault','Extracting snapchat','Extracting instagram','Uploading to server'],'4,382 passwords stolen','#ff2e4d')],
+            ['🏦','دخول الحساب البنكي',()=>terminal('BANK-BREACH',['Spoofing SMS OTP','Bypassing 2FA','Reading balance'],'TRANSFER COMPLETE','#ff2e4d')],
+            ['🦠','حقن فيروس',()=>terminal('VIRUS-INJECT',['Encrypting photos','Encrypting contacts','Locking storage'],'ALL FILES ENCRYPTED','#ff2e4d')],
+            ['🗑️','حذف كل الملفات',()=>terminal('DELETE ALL',['/DCIM','/Download','/WhatsApp','/System'],'DEVICE WIPED','#ff2e4d')],
+            ['🛰️','تتبع الموقع بالقمر',()=>terminal('SAT-TRACK',['Acquiring satellite','Triangulating','Locking target'],'TARGET LOCATED — '+ips())]]},
+           screen:{ic:'⚡',t:'افكتات الشاشة',d:'تعليق وانهيار',items:[
+            ['🧊','تجميد حقيقي (الصفحة تهنق فعلاً)',freeze],['🥶','تجميد اللمس (تقدر تخرج بعده)',freezeSoft],['🟩','شاشة الماتريكس',matrix],['📺','تشويش (Glitch)',glitch],['🔵','شاشة موت زرقاء',bsod],['⏳','تحديث وهمي',update],['🪫','بطارية 1% وإطفاء',battery],['🔨','شاشة مكسورة',crack],['⬛','شاشة سوداء (جوال مطفي)',black],['💡','وميض مرعب',flicker]]},
+           horror:{ic:'💀',t:'رعب',d:'صور وأصوات',items:[
+            ['😱','جامب سكير: وجه',()=>jump('face')],['👁️','جامب سكير: عيون',()=>jump('eyes')],['🩸','دم ينزل',blood],['👻','رسائل شبح',ghost],['🌑','ظلام وعيون',dark],['🎲','رعب عشوائي بعد وقت',randomScare],['💀','جامب سكير: جمجمة',()=>jump('skull')],['🔦','كشاف مرعب (حرك اصبعك)',lamp],['🕷️','عناكب تمشي',spiders],['📞','مكالمة مجهولة',call],['👹','شاشة ممسوسة',possessed],['☠️','عد تنازلي للموت',death],['🗣️','صوت يكلمك (صوت جهازك)',voice]]},
+           audio:{ic:'🔊',t:'أصوات مرعبة',d:'صوت فقط',items:[
+            ['😫','صرخة',sound('scream')],['❤️','نبضات قلب',sound('heart')],['🤫','همس',sound('whisper')],['🚨','سارينة',sound('siren')],['🚪','طرق على الباب',sound('knock')],['😈','ضحكة شريرة',sound('laugh')],['🌀','طنين مخيف',sound('drone')],['📻','تشويش راديو',sound('static_')],['💥','صوت بيس',sound('bass')],['😭','بكاء طفل',sound('cry')],['😮‍💨','أنفاس خلفك',sound('breath')],['⛓️','سلاسل',sound('chains')],['🕷️','خدش',sound('scratch')]]},
+           real:{ic:'🛠️',t:'أدوات حقيقية',d:'كاميرا وكشاف واهتزاز',items:[['📋','فحص الجهاز (بياناتك الحقيقية)',devinfo],['📷','كاميرا حقيقية مرعبة',cam],['🔦','كشاف يومض',torch],['📳','اهتزاز مستمر',vibeLoop],['⛶','ملء الشاشة',fs]]},
+           set:{ic:'⚙️',t:'الإعدادات',d:'مؤقت 10–100 ثانية',items:[]}
+          };
+          function home(){view.innerHTML=`<div class="grid">${Object.entries(MENUS).map(([k,m])=>`<button class="cat" onclick="menu('${k}')"><i>${m.ic}</i>${m.t}<small>${m.d}</small></button>`).join('')}</div><p style="color:var(--mut);font-size:13px;text-align:center;margin-top:18px">للخروج من أي مقلب: اضغط 3 مرات بسرعة أو ✕ فوق يسار.</p>`}
+          function menu(k){const m=MENUS[k];if(k==='set')return settings2();
+           view.innerHTML=`<button class="back" onclick="home()">→ رجوع</button>`+m.items.map((it,i)=>`<button class="item" onclick="run('${k}',${i})"><i>${it[0]}</i><span>${it[1]}</span><em>▶</em></button>`).join('')}
+          function run(k,i){if(AC)AC.resume();const f=MENUS[k].items[i][2];if(!S.dly)return f();
+           let n=S.delay;show(`<div class="center" style="background:#000"><span class="mono" id="cd" style="color:#222;font-size:14px">${n}</span></div>`);
+           const id=setInterval(()=>{n--;const c=$('#cd');if(c)c.textContent=n;if(n<=0){clearInterval(id);f()}},1000);stopFns.push(()=>clearInterval(id))}
+          function settings2(){view.innerHTML=`<button class="back" onclick="home()">→ رجوع</button><div class="set"><label><span>⏱️ مؤقت قبل المقلب (الشاشة تظهر مطفية)</span><input type="checkbox" ${S.dly?'checked':''} onchange="S.dly=this.checked" style="accent-color:#ff2e4d;width:22px;height:22px"></label><label><span>مدة التأخير</span><b id="a">${S.delay}ث</b></label><input type="range" min="10" max="100" value="${S.delay}" oninput="S.delay=+this.value;a.textContent=this.value+'ث'"></div><div class="set"><label><span>🧊 مدة التجميد الحقيقي</span><b id="b">${S.freeze}ث</b></label><input type="range" min="10" max="100" value="${S.freeze}" oninput="S.freeze=+this.value;b.textContent=this.value+'ث'"></div><div class="set"><label><span>🎬 مدة المقلب (افكتات، رعب، كاميرا، كشاف)</span><b id="c">${S.dur}ث</b></label><input type="range" min="10" max="100" value="${S.dur}" oninput="S.dur=+this.value;c.textContent=this.value+'ث'"></div><div class="set"><label><span>🔊 مستوى الصوت</span><b id="e">${Math.round(S.vol*100)}%</b></label><input type="range" min="10" max="100" value="${S.vol*100}" oninput="S.vol=this.value/100;e.textContent=this.value+'%'"></div><div class="set"><label><span>📳 الاهتزاز</span><input type="checkbox" ${S.vib?'checked':''} onchange="S.vib=this.checked" style="accent-color:#ff2e4d;width:22px;height:22px"></label></div><button class="item" onclick="fs()"><i>⛶</i><span>ملء الشاشة</span></button><p style="color:var(--mut);font-size:13px">التجميد الحقيقي يوقف الصفحة فعلاً طول المدة ولا يمكن الخروج منها قبل ما تنتهي. لا تخوّف أحد عنده مشاكل بالقلب أو أطفال صغار.</p>`}
+          function settings(){view.innerHTML=`<button class="back" onclick="home()">→ رجوع</button>
+           <div class="set"><label><span>⏱️ تأخير قبل المقلب (يظهر الجوال مطفي)</span><b id="a">${S.delay}ث</b></label><input type="range" min="0" max="60" value="${S.delay}" oninput="S.delay=+this.value;a.textContent=this.value+'ث'"></div>
+           <div class="set"><label><span>🧊 مدة تجميد الشاشة</span><b id="b">${S.freeze}ث</b></label><input type="range" min="3" max="60" value="${S.freeze}" oninput="S.freeze=+this.value;b.textContent=this.value+'ث'"></div>
+           <div class="set"><label><span>🔊 مستوى الصوت</span><b id="c">${Math.round(S.vol*100)}%</b></label><input type="range" min="10" max="100" value="${S.vol*100}" oninput="S.vol=this.value/100;c.textContent=this.value+'%'"></div>
+           <div class="set"><label><span>📳 الاهتزاز</span><input type="checkbox" ${S.vib?'checked':''} onchange="S.vib=this.checked" style="accent-color:#ff2e4d;width:22px;height:22px"></label></div>
+           <p style="color:var(--mut);font-size:13px">تنبيه: كل شي هنا تمثيل فقط ولا يخترق أي شي حقيقي. لا تخوّف أحد عنده مشاكل بالقلب أو أطفال صغار.</p>`}
+          </script>
+          </body>
+          </html>
+          BX2_EOF
+          cat > app/src/main/java/com/bx2/prank/FreezeService.kt <<'BX2_EOF'
+          package com.bx2.prank
+
+          import android.app.Service
+          import android.content.Intent
+          import android.graphics.PixelFormat
+          import android.os.Handler
+          import android.os.IBinder
+          import android.os.Looper
+          import android.provider.Settings
+          import android.view.View
+          import android.view.WindowManager
+
+          /** Real full-phone freeze: a transparent overlay that swallows every touch for N seconds (10..100), then removes itself. */
+          class FreezeService : Service() {
+              private val h = Handler(Looper.getMainLooper())
+              private var overlay: View? = null
+
+              override fun onBind(intent: Intent?): IBinder? = null
+
+              override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+                  val delay = (intent?.getIntExtra("delay", 0) ?: 0).coerceIn(0, 100)
+                  val dur = (intent?.getIntExtra("dur", 10) ?: 10).coerceIn(10, 100)   // hard limit: never longer than 100s
+                  h.postDelayed({ show(dur) }, delay * 1000L)
+                  return START_NOT_STICKY
+              }
+
+              private fun show(dur: Int) {
+                  if (!Settings.canDrawOverlays(this)) { stopSelf(); return }
+                  val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+                  val lp = WindowManager.LayoutParams(
+                      WindowManager.LayoutParams.MATCH_PARENT,
+                      WindowManager.LayoutParams.MATCH_PARENT,
+                      WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                      WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                          WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                          WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                          WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                      PixelFormat.TRANSLUCENT
+                  )
+                  val v = View(this)
+                  v.setBackgroundColor(0x01000000)          // practically invisible, so the screen looks frozen
+                  v.setOnTouchListener { _, _ -> true }     // eat all touches
+                  wm.addView(v, lp)
+                  overlay = v
+                  h.postDelayed({ finishFreeze() }, dur * 1000L)
+              }
+
+              private fun removeOverlay() {
+                  overlay?.let { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
+                  overlay = null
+              }
+
+              private fun finishFreeze() {
+                  removeOverlay()
+                  val i = Intent(this, MainActivity::class.java)
+                      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                      .putExtra("scare", true)
+                  try { startActivity(i) } catch (_: Exception) {}
+                  stopSelf()
+              }
+
+              override fun onDestroy() {
+                  h.removeCallbacksAndMessages(null)
+                  removeOverlay()
+                  super.onDestroy()
+              }
+          }
+          BX2_EOF
+          cat > app/src/main/java/com/bx2/prank/MainActivity.kt <<'BX2_EOF'
+          package com.bx2.prank
+
+          import android.Manifest
+          import android.content.Intent
+          import android.content.pm.PackageManager
+          import android.graphics.Color
+          import android.net.Uri
+          import android.os.Bundle
+          import android.provider.Settings
+          import android.view.WindowManager
+          import android.webkit.JavascriptInterface
+          import android.webkit.PermissionRequest
+          import android.webkit.WebChromeClient
+          import android.webkit.WebResourceRequest
+          import android.webkit.WebResourceResponse
+          import android.webkit.WebView
+          import android.webkit.WebViewClient
+          import android.widget.Toast
+          import androidx.activity.result.contract.ActivityResultContracts
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.content.ContextCompat
+          import androidx.core.view.WindowCompat
+          import androidx.core.view.WindowInsetsCompat
+          import androidx.core.view.WindowInsetsControllerCompat
+          import androidx.webkit.WebViewAssetLoader
+
+          class MainActivity : AppCompatActivity() {
+              private lateinit var web: WebView
+              private var pending: PermissionRequest? = null
+
+              private val camPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+                  pending?.let { if (ok) it.grant(it.resources) else it.deny() }
+                  pending = null
+              }
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                  WindowCompat.setDecorFitsSystemWindows(window, false)
+
+                  web = WebView(this)
+                  web.setBackgroundColor(Color.parseColor("#0A0710"))
+                  setContentView(web)
+                  hideBars()
+
+                  web.settings.apply {
+                      javaScriptEnabled = true
+                      domStorageEnabled = true
+                      mediaPlaybackRequiresUserGesture = false
+                  }
+                  web.addJavascriptInterface(Bridge(), "BX2")
+
+                  val loader = WebViewAssetLoader.Builder()
+                      .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+                      .build()
+                  web.webViewClient = object : WebViewClient() {
+                      override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+                          loader.shouldInterceptRequest(request.url)
+                  }
+                  web.webChromeClient = object : WebChromeClient() {
+                      override fun onPermissionRequest(request: PermissionRequest) {
+                          runOnUiThread {
+                              if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                                  request.grant(request.resources)
+                              } else {
+                                  pending = request
+                                  camPerm.launch(Manifest.permission.CAMERA)
+                              }
+                          }
+                      }
+                  }
+                  web.loadUrl("https://appassets.androidplatform.net/assets/index.html")
+                  handle(intent)
+              }
+
+              override fun onNewIntent(intent: Intent) {
+                  super.onNewIntent(intent)
+                  setIntent(intent)
+                  handle(intent)
+              }
+
+              private fun handle(i: Intent?) {
+                  if (i?.getBooleanExtra("scare", false) == true) {
+                      i.removeExtra("scare")
+                      web.postDelayed({ web.evaluateJavascript("jump('rand')", null) }, 400)
+                  }
+              }
+
+              private fun hideBars() {
+                  WindowInsetsControllerCompat(window, window.decorView).apply {
+                      hide(WindowInsetsCompat.Type.systemBars())
+                      systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                  }
+              }
+
+              override fun onWindowFocusChanged(hasFocus: Boolean) {
+                  super.onWindowFocusChanged(hasFocus)
+                  if (hasFocus) hideBars()
+              }
+
+              inner class Bridge {
+                  @JavascriptInterface
+                  fun freezeAll(delay: Int, dur: Int) {
+                      runOnUiThread {
+                          if (!Settings.canDrawOverlays(this@MainActivity)) {
+                              Toast.makeText(this@MainActivity, "فعّل خيار العرض فوق التطبيقات ثم ارجع", Toast.LENGTH_LONG).show()
+                              startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+                              return@runOnUiThread
+                          }
+                          startService(Intent(this@MainActivity, FreezeService::class.java).putExtra("delay", delay).putExtra("dur", dur))
+                          moveTaskToBack(true)
+                      }
+                  }
+              }
+          }
+          BX2_EOF
+          cat > app/src/main/res/drawable/ic_fg.xml <<'BX2_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#EFE9F7" android:pathData="M54,26c-16,0 -26,11 -26,25c0,8 3,14 8,18v8h36v-8c5,-4 8,-10 8,-18c0,-14 -10,-25 -26,-25z"/>
+              <path android:fillColor="#0A0710" android:pathData="M39,52a6,6 0 1,0 12,0a6,6 0 1,0 -12,0z"/>
+              <path android:fillColor="#0A0710" android:pathData="M57,52a6,6 0 1,0 12,0a6,6 0 1,0 -12,0z"/>
+              <path android:fillColor="#FF2E4D" android:pathData="M43,52a2,2 0 1,0 4,0a2,2 0 1,0 -4,0z"/>
+              <path android:fillColor="#FF2E4D" android:pathData="M61,52a2,2 0 1,0 4,0a2,2 0 1,0 -4,0z"/>
+              <path android:fillColor="#0A0710" android:pathData="M54,58l-3,7h6z"/>
+          </vector>
+          BX2_EOF
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'BX2_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_bg" />
+              <foreground android:drawable="@drawable/ic_fg" />
+          </adaptive-icon>
+          BX2_EOF
+          cat > app/src/main/res/values/colors.xml <<'BX2_EOF'
+          <resources><color name="ic_bg">#150F1F</color></resources>
+          BX2_EOF
+          cat > app/src/main/res/values/strings.xml <<'BX2_EOF'
+          <resources><string name="app_name">BX2 Prank</string></resources>
+          BX2_EOF
+          cat > app/src/main/res/values/themes.xml <<'BX2_EOF'
+          <resources>
+              <style name="Theme.BX2" parent="Theme.AppCompat.DayNight.NoActionBar">
+                  <item name="android:windowBackground">@color/ic_bg</item>
+                  <item name="android:statusBarColor">@color/ic_bg</item>
+                  <item name="android:navigationBarColor">@color/ic_bg</item>
+              </style>
+          </resources>
+          BX2_EOF
+          cat > build.gradle.kts <<'BX2_EOF'
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          BX2_EOF
+          cat > gradle.properties <<'BX2_EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          kotlin.code.style=official
+          BX2_EOF
+          cat > settings.gradle.kts <<'BX2_EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "BX2Prank"
+          include(":app")
+          BX2_EOF
+      - name: Build APK
+        run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BX2-Prank-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
